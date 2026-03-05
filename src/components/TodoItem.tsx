@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { motion } from 'framer-motion'
 
 import type { Todo } from '../types'
 import { CheckIcon, ClockIcon, PencilIcon, TrashIcon, XIcon } from './Icons'
@@ -112,7 +113,14 @@ export function TodoItem({ todo, onToggle, onToggleInProgress, onDelete, onUpdat
   }
 
   return (
-    <li className="group grid grid-cols-[auto,1fr] items-start gap-x-3 gap-y-2 px-4 py-3 sm:grid-cols-[auto,1fr,8.5rem,9rem,auto] sm:items-center">
+    <motion.li
+      layout
+      initial={{ opacity: 0, y: 10, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -10, scale: 0.98 }}
+      transition={{ type: 'spring', stiffness: 520, damping: 42, mass: 0.9 }}
+      className="group grid grid-cols-[auto,1fr] items-start gap-x-3 gap-y-2 px-4 py-3 sm:grid-cols-[auto,minmax(18rem,1fr),11rem,12rem,auto] sm:items-center"
+    >
       <div className="mt-0.5 flex items-center gap-2 sm:mt-0">
         <button
           type="button"
@@ -147,7 +155,7 @@ export function TodoItem({ todo, onToggle, onToggleInProgress, onDelete, onUpdat
 
       <div className="min-w-0">
         {isEditing ? (
-          <div className="grid gap-2 sm:grid-cols-[1fr,8.5rem,9rem] sm:items-center">
+          <>
             <input
               ref={titleInputRef}
               value={draftTitle}
@@ -161,31 +169,33 @@ export function TodoItem({ todo, onToggle, onToggleInProgress, onDelete, onUpdat
               maxLength={200}
             />
 
-            <input
-              type="date"
-              value={draftDueBy}
-              onChange={(e) => setDraftDueBy(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commit()
-                if (e.key === 'Escape') cancel()
-              }}
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none ring-indigo-500/20 focus:border-indigo-300 focus:ring-4 dark:border-slate-800 dark:bg-slate-950 dark:focus:border-indigo-500"
-              aria-label="Edit due date"
-            />
+            <div className="mt-2 grid gap-2 sm:hidden">
+              <input
+                type="date"
+                value={draftDueBy}
+                onChange={(e) => setDraftDueBy(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commit()
+                  if (e.key === 'Escape') cancel()
+                }}
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none ring-indigo-500/20 focus:border-indigo-300 focus:ring-4 dark:border-slate-800 dark:bg-slate-950 dark:focus:border-indigo-500"
+                aria-label="Edit due date"
+              />
 
-            <input
-              value={draftReportTo}
-              onChange={(e) => setDraftReportTo(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') commit()
-                if (e.key === 'Escape') cancel()
-              }}
-              placeholder="Report to"
-              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none ring-indigo-500/20 placeholder:text-slate-400 focus:border-indigo-300 focus:ring-4 dark:border-slate-800 dark:bg-slate-950 dark:placeholder:text-slate-500 dark:focus:border-indigo-500"
-              aria-label="Edit report to"
-              maxLength={60}
-            />
-          </div>
+              <input
+                value={draftReportTo}
+                onChange={(e) => setDraftReportTo(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') commit()
+                  if (e.key === 'Escape') cancel()
+                }}
+                placeholder="Report to"
+                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none ring-indigo-500/20 placeholder:text-slate-400 focus:border-indigo-300 focus:ring-4 dark:border-slate-800 dark:bg-slate-950 dark:placeholder:text-slate-500 dark:focus:border-indigo-500"
+                aria-label="Edit report to"
+                maxLength={60}
+              />
+            </div>
+          </>
         ) : (
           <button type="button" className="w-full text-left" onDoubleClick={startEditing}>
             <div className="flex flex-wrap items-center gap-2">
@@ -217,20 +227,49 @@ export function TodoItem({ todo, onToggle, onToggleInProgress, onDelete, onUpdat
       </div>
 
       <div className="hidden sm:block">
-        <p className={`text-sm font-medium ${dueTone}`}>{dueText}</p>
+        {isEditing ? (
+          <input
+            type="date"
+            value={draftDueBy}
+            onChange={(e) => setDraftDueBy(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commit()
+              if (e.key === 'Escape') cancel()
+            }}
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none ring-indigo-500/20 focus:border-indigo-300 focus:ring-4 dark:border-slate-800 dark:bg-slate-950 dark:focus:border-indigo-500"
+            aria-label="Edit due date"
+          />
+        ) : (
+          <p className={`text-sm font-medium ${dueTone}`}>{dueText}</p>
+        )}
       </div>
 
       <div className="hidden min-w-0 sm:block">
-        <p className="truncate text-sm text-slate-600 dark:text-slate-300">{todo.reportTo || '—'}</p>
+        {isEditing ? (
+          <input
+            value={draftReportTo}
+            onChange={(e) => setDraftReportTo(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commit()
+              if (e.key === 'Escape') cancel()
+            }}
+            placeholder="Report to"
+            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none ring-indigo-500/20 placeholder:text-slate-400 focus:border-indigo-300 focus:ring-4 dark:border-slate-800 dark:bg-slate-950 dark:placeholder:text-slate-500 dark:focus:border-indigo-500"
+            aria-label="Edit report to"
+            maxLength={60}
+          />
+        ) : (
+          <p className="truncate text-sm text-slate-600 dark:text-slate-300">{todo.reportTo || '—'}</p>
+        )}
       </div>
 
-      <div className="flex items-center justify-end gap-1">
+      <div className="col-start-2 flex items-center justify-end gap-1 sm:col-auto">
         {isEditing ? (
           <>
             <button
               type="button"
               onClick={commit}
-              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60"
+              className="inline-flex rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 sm:text-sm"
             >
               Save
             </button>
@@ -248,7 +287,7 @@ export function TodoItem({ todo, onToggle, onToggleInProgress, onDelete, onUpdat
             <button
               type="button"
               onClick={startEditing}
-              className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 opacity-0 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 group-hover:opacity-100 group-focus-within:opacity-100 dark:text-slate-400 dark:hover:bg-slate-900/50 dark:hover:text-slate-200"
+              className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 opacity-100 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 dark:text-slate-400 dark:hover:bg-slate-900/50 dark:hover:text-slate-200"
               aria-label="Edit"
             >
               <PencilIcon className="h-4 w-4" />
@@ -257,7 +296,7 @@ export function TodoItem({ todo, onToggle, onToggleInProgress, onDelete, onUpdat
             <button
               type="button"
               onClick={() => onDelete(todo.id)}
-              className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 opacity-0 transition hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 group-hover:opacity-100 group-focus-within:opacity-100 dark:text-slate-400 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
+              className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 opacity-100 transition hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 dark:text-slate-400 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
               aria-label="Delete"
             >
               <TrashIcon className="h-4 w-4" />
@@ -265,6 +304,6 @@ export function TodoItem({ todo, onToggle, onToggleInProgress, onDelete, onUpdat
           </>
         )}
       </div>
-    </li>
+    </motion.li>
   )
 }
