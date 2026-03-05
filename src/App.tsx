@@ -18,6 +18,7 @@ function formatDate(timestamp: number) {
 const FILTERS: Array<{ key: Filter; label: string }> = [
   { key: 'all', label: 'All' },
   { key: 'active', label: 'Active' },
+  { key: 'in_progress', label: 'In Progress' },
   { key: 'completed', label: 'Completed' },
 ]
 
@@ -35,7 +36,9 @@ export default function App() {
 
   const safeTheme: Theme = theme === 'light' || theme === 'dark' || theme === 'system' ? theme : 'system'
   const safeFilter: Filter =
-    filter === 'all' || filter === 'active' || filter === 'completed' ? filter : 'all'
+    filter === 'all' || filter === 'active' || filter === 'in_progress' || filter === 'completed'
+      ? filter
+      : 'all'
 
   useEffect(() => {
     if (theme !== safeTheme) setTheme(safeTheme)
@@ -73,8 +76,9 @@ export default function App() {
 
     return todos
       .filter((t) => {
-        if (safeFilter === 'active') return !t.completed
-        if (safeFilter === 'completed') return t.completed
+        if (safeFilter === 'active') return !t.completed && !t.inProgress
+        if (safeFilter === 'in_progress') return !!t.inProgress && !t.completed
+        if (safeFilter === 'completed') return !!t.completed
         return true
       })
       .filter((t) => (normalizedQuery.length ? t.title.toLowerCase().includes(normalizedQuery) : true))
@@ -91,6 +95,7 @@ export default function App() {
       id: uid(),
       title: trimmed,
       completed: false,
+      inProgress: false,
       createdAt: now,
       updatedAt: now,
     }
@@ -192,7 +197,14 @@ export default function App() {
                 <button
                   type="button"
                   onClick={() => {
-                    setTodos((prev) => prev.map((t) => ({ ...t, completed: !allCompleted, updatedAt: Date.now() })))
+                    setTodos((prev) =>
+                      prev.map((t) => ({
+                        ...t,
+                        completed: !allCompleted,
+                        inProgress: false,
+                        updatedAt: Date.now(),
+                      }))
+                    )
                   }}
                   className="hidden rounded-2xl border border-slate-200 bg-white/70 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200 dark:hover:bg-slate-950 sm:inline-flex"
                   disabled={stats.total === 0}
@@ -211,7 +223,20 @@ export default function App() {
                     key={todo.id}
                     todo={todo}
                     onToggle={(id) =>
-                      updateTodo(id, (t) => ({ ...t, completed: !t.completed, updatedAt: Date.now() }))
+                      updateTodo(id, (t) => ({
+                        ...t,
+                        completed: !t.completed,
+                        inProgress: false,
+                        updatedAt: Date.now(),
+                      }))
+                    }
+                    onToggleInProgress={(id) =>
+                      updateTodo(id, (t) => ({
+                        ...t,
+                        inProgress: !t.inProgress,
+                        completed: false,
+                        updatedAt: Date.now(),
+                      }))
                     }
                     onDelete={(id) => setTodos((prev) => prev.filter((t) => t.id !== id))}
                     onUpdateTitle={(id, title) =>
