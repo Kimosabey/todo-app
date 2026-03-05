@@ -10,6 +10,7 @@ A frontend-only todo app built with **React + TypeScript + Vite + Tailwind CSS**
 - Columns: **To be completed by** (due date) and **Report to**
 - Persists to `localStorage`
 - Theme toggle: system → light → dark
+- Analytics view with multiple ECharts charts (static demo data)
 
 ## Getting started
 

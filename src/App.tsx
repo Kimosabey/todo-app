@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
 
 import { PlusIcon } from './components/Icons'
@@ -7,6 +7,13 @@ import { TodoItem } from './components/TodoItem'
 import { uid } from './lib/uid'
 import { useLocalStorageState } from './lib/useLocalStorageState'
 import type { Filter, Theme, Todo } from './types'
+
+
+const AnalyticsView = lazy(() =>
+  import('./components/Analytics').then((m) => ({
+    default: m.Analytics,
+  })),
+)
 
 function formatDate(timestamp: number) {
   return new Intl.DateTimeFormat(undefined, {
@@ -28,6 +35,7 @@ const APP_STARTED_AT = Date.now()
 
 export default function App() {
   const [theme, setTheme] = useLocalStorageState<Theme>('todo.theme', 'system')
+  const [view, setView] = useLocalStorageState<'todos' | 'analytics'>('todo.view', 'todos')
   const [filter, setFilter] = useLocalStorageState<Filter>('todo.filter', 'all')
   const [todos, setTodos] = useLocalStorageState<Todo[]>('todo.todos', [])
 
@@ -35,6 +43,7 @@ export default function App() {
   const [draft, setDraft] = useState('')
   const [draftDueBy, setDraftDueBy] = useState('')
   const [draftReportTo, setDraftReportTo] = useState('')
+  const [isDark, setIsDark] = useState(false)
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   const safeTheme: Theme = theme === 'light' || theme === 'dark' || theme === 'system' ? theme : 'system'
@@ -42,6 +51,9 @@ export default function App() {
     filter === 'all' || filter === 'active' || filter === 'in_progress' || filter === 'completed'
       ? filter
       : 'all'
+
+  const safeView: 'todos' | 'analytics' = view === 'analytics' || view === 'todos' ? view : 'todos'
+
 
   useEffect(() => {
     if (theme !== safeTheme) setTheme(safeTheme)
@@ -51,13 +63,19 @@ export default function App() {
     if (filter !== safeFilter) setFilter(safeFilter)
   }, [filter, safeFilter, setFilter])
 
+
+  useEffect(() => {
+    if (view !== safeView) setView(safeView)
+  }, [safeView, setView, view])
+
   useEffect(() => {
     const root = document.documentElement
     const media = window.matchMedia('(prefers-color-scheme: dark)')
 
     const apply = () => {
-      const isDark = safeTheme === 'dark' || (safeTheme === 'system' && media.matches)
-      root.classList.toggle('dark', isDark)
+      const nextIsDark = safeTheme === 'dark' || (safeTheme === 'system' && media.matches)
+      root.classList.toggle('dark', nextIsDark)
+      setIsDark(nextIsDark)
     }
 
     apply()
@@ -173,7 +191,12 @@ export default function App() {
               Todo, beautifully.
             </h1>
             <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">
-              {formatDate(APP_STARTED_AT)} · {stats.remaining} remaining
+              {formatDate(APP_STARTED_AT)} ·{' '}
+              {safeView === 'todos' ? (
+                <>{stats.remaining} remaining</>
+              ) : (
+                <>Analytics overview</>
+              )}
             </p>
           </div>
 
@@ -186,7 +209,43 @@ export default function App() {
           transition={{ duration: 0.55, ease: 'easeOut', delay: 0.05 }}
           className="mt-6 overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 shadow-soft backdrop-blur dark:border-slate-800/60 dark:bg-slate-950/50"
         >
-          <div className="space-y-4 p-4 sm:p-5">
+          <div className="flex flex-col gap-3 border-b border-slate-200/70 p-4 dark:border-slate-800/60 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+            <div className="inline-flex rounded-2xl border border-slate-200 bg-white/70 p-1 shadow-sm dark:border-slate-800 dark:bg-slate-950/40">
+              {(['todos', 'analytics'] as const).map((k) => {
+                const active = k === safeView
+                const label = k === 'todos' ? 'Todos' : 'Analytics'
+                return (
+                  <button
+                    key={k}
+                    type="button"
+                    onClick={() => setView(k)}
+                    className={
+                      active
+                        ? 'rounded-xl bg-slate-900 px-3 py-2 text-sm font-semibold text-white shadow-sm dark:bg-white dark:text-slate-900'
+                        : 'rounded-xl px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-white dark:text-slate-200 dark:hover:bg-slate-950'
+                    }
+                  >
+                    {label}
+                  </button>
+                )
+              })}
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              {safeView === 'todos' ? 'Organize your day.' : 'Static demo charts (ECharts).'}
+            </p>
+          </div>
+
+          <AnimatePresence mode="wait" initial={false}>
+            {safeView === 'todos' ? (
+              <motion.div
+                key="todos"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+              >
+                <div className="space-y-4 p-4 sm:p-5">
             <form
               className="grid gap-3 sm:grid-cols-[minmax(18rem,1fr),11rem,12rem,auto]"
               onSubmit={(e) => {
@@ -404,10 +463,38 @@ export default function App() {
               </button>
             </div>
           </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="analytics"
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+              >
+                <Suspense
+                  fallback={
+                    <div className="p-4 text-sm text-slate-600 dark:text-slate-300 sm:p-5">
+                      Loading analytics…
+                    </div>
+                  }
+                >
+                  <AnalyticsView isDark={isDark} />
+                </Suspense>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </motion.main>
 
         <footer className="mt-6 text-xs text-slate-500 dark:text-slate-400">
-          Tip: Press <span className="font-semibold text-slate-700 dark:text-slate-200">Enter</span> to add. Double-click a task to edit. Use the clock to mark “In progress”.
+          {safeView === 'todos' ? (
+            <>
+              Tip: Press <span className="font-semibold text-slate-700 dark:text-slate-200">Enter</span> to
+              add. Double-click a task to edit. Use the clock to mark “In progress”.
+            </>
+          ) : (
+            <>Tip: These charts use static demo data (for now).</>
+          )}
         </footer>
       </div>
     </motion.div>
