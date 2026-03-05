@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Todo } from '../types'
-import { CheckIcon, ClockIcon, PencilIcon, TrashIcon } from './Icons'
+import { CheckIcon, ClockIcon, PencilIcon, TrashIcon, XIcon } from './Icons'
 
 type Props = {
   todo: Todo
   onToggle: (id: string) => void
   onToggleInProgress: (id: string) => void
   onDelete: (id: string) => void
-  onUpdateTitle: (id: string, title: string) => void
+  onUpdate: (id: string, patch: Pick<Todo, 'title' | 'dueBy' | 'reportTo'>) => void
 }
 
 function formatTime(timestamp: number) {
@@ -18,20 +18,47 @@ function formatTime(timestamp: number) {
   }).format(new Date(timestamp))
 }
 
-export function TodoItem({ todo, onToggle, onToggleInProgress, onDelete, onUpdateTitle }: Props) {
+function parseDueDate(dueBy: string) {
+  if (!dueBy) return null
+
+  const d = new Date(`${dueBy}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return null
+  return d
+}
+
+function formatDue(dueBy: string) {
+  const d = parseDueDate(dueBy)
+  if (!d) return '—'
+
+  return new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: '2-digit',
+  }).format(d)
+}
+
+function startOfToday() {
+  const now = new Date()
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+}
+
+export function TodoItem({ todo, onToggle, onToggleInProgress, onDelete, onUpdate }: Props) {
   const [isEditing, setIsEditing] = useState(false)
-  const [draft, setDraft] = useState(todo.title)
-  const inputRef = useRef<HTMLInputElement | null>(null)
+  const [draftTitle, setDraftTitle] = useState(todo.title)
+  const [draftDueBy, setDraftDueBy] = useState(todo.dueBy)
+  const [draftReportTo, setDraftReportTo] = useState(todo.reportTo)
+  const titleInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     if (isEditing) {
-      inputRef.current?.focus()
-      inputRef.current?.select()
+      titleInputRef.current?.focus()
+      titleInputRef.current?.select()
     }
   }, [isEditing])
 
   function startEditing() {
-    setDraft(todo.title)
+    setDraftTitle(todo.title)
+    setDraftDueBy(todo.dueBy)
+    setDraftReportTo(todo.reportTo)
     setIsEditing(true)
   }
 
@@ -40,26 +67,53 @@ export function TodoItem({ todo, onToggle, onToggleInProgress, onDelete, onUpdat
     return `added ${formatTime(todo.createdAt)}`
   }, [todo.createdAt, todo.updatedAt])
 
+  const dueText = useMemo(() => formatDue(todo.dueBy), [todo.dueBy])
+
+  const dueTone = useMemo(() => {
+    const d = parseDueDate(todo.dueBy)
+    if (!d || todo.completed) return 'text-slate-600 dark:text-slate-300'
+
+    if (d < startOfToday()) return 'text-rose-600 dark:text-rose-300'
+
+    const inTwoDays = new Date(startOfToday().getTime() + 2 * 24 * 60 * 60 * 1000)
+    if (d <= inTwoDays) return 'text-amber-700 dark:text-amber-200'
+
+    return 'text-slate-600 dark:text-slate-300'
+  }, [todo.completed, todo.dueBy])
+
   function commit() {
-    const next = draft.trim()
-    if (next.length === 0) {
-      setDraft(todo.title)
+    const nextTitle = draftTitle.trim()
+    if (!nextTitle) {
+      setDraftTitle(todo.title)
+      setDraftDueBy(todo.dueBy)
+      setDraftReportTo(todo.reportTo)
       setIsEditing(false)
       return
     }
 
-    if (next !== todo.title) onUpdateTitle(todo.id, next)
+    const patch = {
+      title: nextTitle,
+      dueBy: draftDueBy,
+      reportTo: draftReportTo.trim(),
+    }
+
+    if (patch.title !== todo.title || patch.dueBy !== todo.dueBy || patch.reportTo !== todo.reportTo) {
+      onUpdate(todo.id, patch)
+    }
+
     setIsEditing(false)
   }
 
   function cancel() {
-    setDraft(todo.title)
+    setDraftTitle(todo.title)
+    setDraftDueBy(todo.dueBy)
+    setDraftReportTo(todo.reportTo)
     setIsEditing(false)
   }
 
   return (
-    <li className="group flex items-start gap-3 px-4 py-3">
-      <div className="mt-0.5 flex items-center gap-2">
+    <li className="group grid grid-cols-[auto,1fr] items-start gap-x-3 gap-y-2 px-4 py-3 sm:grid-cols-[auto,1fr,8.5rem,9rem,auto] sm:items-center">
+      <div className="mt-0.5 flex items-center gap-2 sm:mt-0">
         <button
           type="button"
           onClick={() => onToggle(todo.id)}
@@ -91,20 +145,47 @@ export function TodoItem({ todo, onToggle, onToggleInProgress, onDelete, onUpdat
         </button>
       </div>
 
-      <div className="min-w-0 flex-1">
+      <div className="min-w-0">
         {isEditing ? (
-          <input
-            ref={inputRef}
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onBlur={commit}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') commit()
-              if (e.key === 'Escape') cancel()
-            }}
-            className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[15px] shadow-sm outline-none ring-indigo-500/20 placeholder:text-slate-400 focus:border-indigo-300 focus:ring-4 dark:border-slate-800 dark:bg-slate-950 dark:placeholder:text-slate-500 dark:focus:border-indigo-500"
-            aria-label="Edit todo"
-          />
+          <div className="grid gap-2 sm:grid-cols-[1fr,8.5rem,9rem] sm:items-center">
+            <input
+              ref={titleInputRef}
+              value={draftTitle}
+              onChange={(e) => setDraftTitle(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commit()
+                if (e.key === 'Escape') cancel()
+              }}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-[15px] shadow-sm outline-none ring-indigo-500/20 placeholder:text-slate-400 focus:border-indigo-300 focus:ring-4 dark:border-slate-800 dark:bg-slate-950 dark:placeholder:text-slate-500 dark:focus:border-indigo-500"
+              aria-label="Edit todo title"
+              maxLength={200}
+            />
+
+            <input
+              type="date"
+              value={draftDueBy}
+              onChange={(e) => setDraftDueBy(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commit()
+                if (e.key === 'Escape') cancel()
+              }}
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none ring-indigo-500/20 focus:border-indigo-300 focus:ring-4 dark:border-slate-800 dark:bg-slate-950 dark:focus:border-indigo-500"
+              aria-label="Edit due date"
+            />
+
+            <input
+              value={draftReportTo}
+              onChange={(e) => setDraftReportTo(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commit()
+                if (e.key === 'Escape') cancel()
+              }}
+              placeholder="Report to"
+              className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none ring-indigo-500/20 placeholder:text-slate-400 focus:border-indigo-300 focus:ring-4 dark:border-slate-800 dark:bg-slate-950 dark:placeholder:text-slate-500 dark:focus:border-indigo-500"
+              aria-label="Edit report to"
+              maxLength={60}
+            />
+          </div>
         ) : (
           <button type="button" className="w-full text-left" onDoubleClick={startEditing}>
             <div className="flex flex-wrap items-center gap-2">
@@ -123,31 +204,66 @@ export function TodoItem({ todo, onToggle, onToggleInProgress, onDelete, onUpdat
                 </span>
               ) : null}
             </div>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{meta}</p>
+
+            <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500 dark:text-slate-400">
+              <span>{meta}</span>
+              <span className="sm:hidden">
+                · <span className={dueTone}>{dueText}</span>
+              </span>
+              {todo.reportTo ? <span className="sm:hidden">· {todo.reportTo}</span> : null}
+            </div>
           </button>
         )}
       </div>
 
-      <div className="flex items-center gap-1 opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
-        {!isEditing ? (
-          <button
-            type="button"
-            onClick={startEditing}
-            className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 dark:text-slate-400 dark:hover:bg-slate-900/50 dark:hover:text-slate-200"
-            aria-label="Edit"
-          >
-            <PencilIcon className="h-4 w-4" />
-          </button>
-        ) : null}
+      <div className="hidden sm:block">
+        <p className={`text-sm font-medium ${dueTone}`}>{dueText}</p>
+      </div>
 
-        <button
-          type="button"
-          onClick={() => onDelete(todo.id)}
-          className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 transition hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 dark:text-slate-400 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
-          aria-label="Delete"
-        >
-          <TrashIcon className="h-4 w-4" />
-        </button>
+      <div className="hidden min-w-0 sm:block">
+        <p className="truncate text-sm text-slate-600 dark:text-slate-300">{todo.reportTo || '—'}</p>
+      </div>
+
+      <div className="flex items-center justify-end gap-1">
+        {isEditing ? (
+          <>
+            <button
+              type="button"
+              onClick={commit}
+              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60"
+            >
+              Save
+            </button>
+            <button
+              type="button"
+              onClick={cancel}
+              className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 dark:text-slate-400 dark:hover:bg-slate-900/50 dark:hover:text-slate-200"
+              aria-label="Cancel"
+            >
+              <XIcon className="h-4 w-4" />
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={startEditing}
+              className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 opacity-0 transition hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 group-hover:opacity-100 group-focus-within:opacity-100 dark:text-slate-400 dark:hover:bg-slate-900/50 dark:hover:text-slate-200"
+              aria-label="Edit"
+            >
+              <PencilIcon className="h-4 w-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onDelete(todo.id)}
+              className="grid h-9 w-9 place-items-center rounded-xl text-slate-500 opacity-0 transition hover:bg-rose-50 hover:text-rose-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 group-hover:opacity-100 group-focus-within:opacity-100 dark:text-slate-400 dark:hover:bg-rose-500/10 dark:hover:text-rose-300"
+              aria-label="Delete"
+            >
+              <TrashIcon className="h-4 w-4" />
+            </button>
+          </>
+        )}
       </div>
     </li>
   )

@@ -32,6 +32,8 @@ export default function App() {
 
   const [query, setQuery] = useState('')
   const [draft, setDraft] = useState('')
+  const [draftDueBy, setDraftDueBy] = useState('')
+  const [draftReportTo, setDraftReportTo] = useState('')
   const inputRef = useRef<HTMLInputElement | null>(null)
 
   const safeTheme: Theme = theme === 'light' || theme === 'dark' || theme === 'system' ? theme : 'system'
@@ -65,6 +67,44 @@ export default function App() {
     return () => media.removeEventListener('change', apply)
   }, [safeTheme])
 
+  useEffect(() => {
+    let changed = false
+
+    const normalized = todos.map((t) => {
+      const anyT = t as unknown as Record<string, unknown>
+
+      const title = typeof anyT.title === 'string' ? (anyT.title as string) : ''
+      const completed = Boolean(anyT.completed)
+      const inProgress = Boolean(anyT.inProgress)
+      const dueBy = typeof anyT.dueBy === 'string' ? (anyT.dueBy as string) : ''
+      const reportTo = typeof anyT.reportTo === 'string' ? (anyT.reportTo as string) : ''
+
+      const next: Todo = {
+        ...t,
+        title,
+        completed,
+        inProgress,
+        dueBy,
+        reportTo,
+      }
+
+      if (
+        next.title !== t.title ||
+        next.completed !== t.completed ||
+        next.inProgress !== t.inProgress ||
+        next.dueBy !== t.dueBy ||
+        next.reportTo !== t.reportTo
+      ) {
+        changed = true
+      }
+
+      return next
+    })
+
+    if (changed) setTodos(normalized)
+  }, [setTodos, todos])
+
+
   const stats = useMemo(() => {
     const completed = todos.filter((t) => t.completed).length
     const remaining = todos.length - completed
@@ -81,12 +121,16 @@ export default function App() {
         if (safeFilter === 'completed') return !!t.completed
         return true
       })
-      .filter((t) => (normalizedQuery.length ? t.title.toLowerCase().includes(normalizedQuery) : true))
+      .filter((t) =>
+        normalizedQuery.length
+          ? `${t.title} ${t.reportTo}`.toLowerCase().includes(normalizedQuery)
+          : true,
+      )
   }, [query, safeFilter, todos])
 
   const allCompleted = stats.total > 0 && stats.remaining === 0
 
-  function addTodo(title: string) {
+  function addTodo(title: string, dueBy: string, reportTo: string) {
     const trimmed = title.trim()
     if (!trimmed) return
 
@@ -96,6 +140,8 @@ export default function App() {
       title: trimmed,
       completed: false,
       inProgress: false,
+      dueBy,
+      reportTo: reportTo.trim(),
       createdAt: now,
       updatedAt: now,
     }
@@ -126,15 +172,17 @@ export default function App() {
         <main className="mt-6 overflow-hidden rounded-3xl border border-slate-200/70 bg-white/70 shadow-soft backdrop-blur dark:border-slate-800/60 dark:bg-slate-950/50">
           <div className="space-y-4 p-4 sm:p-5">
             <form
-              className="flex flex-col gap-3 sm:flex-row"
+              className="grid gap-3 sm:grid-cols-[1fr,10rem,10rem,auto]"
               onSubmit={(e) => {
                 e.preventDefault()
-                addTodo(draft)
+                addTodo(draft, draftDueBy, draftReportTo)
                 setDraft('')
+                setDraftDueBy('')
+                setDraftReportTo('')
                 inputRef.current?.focus()
               }}
             >
-              <div className="flex-1">
+              <div>
                 <label htmlFor="new-todo" className="sr-only">
                   Add a todo
                 </label>
@@ -143,10 +191,37 @@ export default function App() {
                   ref={inputRef}
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  placeholder="What would you like to get done?"
+                  placeholder="Task"
                   className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-[15px] shadow-sm outline-none ring-indigo-500/20 placeholder:text-slate-400 focus:border-indigo-300 focus:ring-4 dark:border-slate-800 dark:bg-slate-950 dark:placeholder:text-slate-500 dark:focus:border-indigo-500"
                   autoComplete="off"
                   maxLength={200}
+                />
+              </div>
+
+              <div>
+                <label htmlFor="due-by" className="sr-only">
+                  To be completed by
+                </label>
+                <input
+                  id="due-by"
+                  type="date"
+                  value={draftDueBy}
+                  onChange={(e) => setDraftDueBy(e.target.value)}
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm shadow-sm outline-none ring-indigo-500/20 focus:border-indigo-300 focus:ring-4 dark:border-slate-800 dark:bg-slate-950 dark:focus:border-indigo-500"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="report-to" className="sr-only">
+                  Report to
+                </label>
+                <input
+                  id="report-to"
+                  value={draftReportTo}
+                  onChange={(e) => setDraftReportTo(e.target.value)}
+                  placeholder="Report to"
+                  className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm shadow-sm outline-none ring-indigo-500/20 placeholder:text-slate-400 focus:border-indigo-300 focus:ring-4 dark:border-slate-800 dark:bg-slate-950 dark:placeholder:text-slate-500 dark:focus:border-indigo-500"
+                  maxLength={60}
                 />
               </div>
 
@@ -217,34 +292,48 @@ export default function App() {
 
           <div className="border-t border-slate-200/70 dark:border-slate-800/60">
             {visibleTodos.length ? (
-              <ul className="max-h-[55vh] divide-y divide-slate-200/70 overflow-auto no-scrollbar dark:divide-slate-800/60">
-                {visibleTodos.map((todo) => (
-                  <TodoItem
-                    key={todo.id}
-                    todo={todo}
-                    onToggle={(id) =>
-                      updateTodo(id, (t) => ({
-                        ...t,
-                        completed: !t.completed,
-                        inProgress: false,
-                        updatedAt: Date.now(),
-                      }))
-                    }
-                    onToggleInProgress={(id) =>
-                      updateTodo(id, (t) => ({
-                        ...t,
-                        inProgress: !t.inProgress,
-                        completed: false,
-                        updatedAt: Date.now(),
-                      }))
-                    }
-                    onDelete={(id) => setTodos((prev) => prev.filter((t) => t.id !== id))}
-                    onUpdateTitle={(id, title) =>
-                      updateTodo(id, (t) => ({ ...t, title, updatedAt: Date.now() }))
-                    }
-                  />
-                ))}
-              </ul>
+              <>
+                <div className="hidden grid-cols-[auto,1fr,8.5rem,9rem,auto] items-center gap-x-3 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 sm:grid">
+                  <div className="w-[3.5rem]" />
+                  <div>Task</div>
+                  <div>To be completed by</div>
+                  <div>Report to</div>
+                  <div className="w-[7.5rem] text-right">Actions</div>
+                </div>
+
+                <ul className="max-h-[55vh] divide-y divide-slate-200/70 overflow-auto no-scrollbar dark:divide-slate-800/60">
+                  {visibleTodos.map((todo) => (
+                    <TodoItem
+                      key={todo.id}
+                      todo={todo}
+                      onToggle={(id) =>
+                        updateTodo(id, (t) => ({
+                          ...t,
+                          completed: !t.completed,
+                          inProgress: false,
+                          updatedAt: Date.now(),
+                        }))
+                      }
+                      onToggleInProgress={(id) =>
+                        updateTodo(id, (t) => ({
+                          ...t,
+                          inProgress: !t.inProgress,
+                          completed: false,
+                          updatedAt: Date.now(),
+                        }))
+                      }
+                      onDelete={(id) => setTodos((prev) => prev.filter((t) => t.id !== id))}
+                      onUpdate={(id, patch) =>
+                        updateTodo(id, (t) => ({
+                          ...t,
+                          ...patch,
+                          updatedAt: Date.now(),
+                        }))
+                      }
+                    />
+                  ))}
+                </ul>
+              </>
             ) : (
               <div className="grid place-items-center px-6 py-14 text-center">
                 <div className="max-w-sm">
@@ -281,6 +370,8 @@ export default function App() {
                   setTodos([])
                   setQuery('')
                   setDraft('')
+                  setDraftDueBy('')
+                  setDraftReportTo('')
                   inputRef.current?.focus()
                 }}
                 className="rounded-2xl border border-slate-200 bg-white/70 px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-rose-500/60 disabled:cursor-not-allowed disabled:opacity-50 dark:border-slate-800 dark:bg-slate-950/40 dark:text-slate-200 dark:hover:bg-slate-950"
@@ -293,7 +384,7 @@ export default function App() {
         </main>
 
         <footer className="mt-6 text-xs text-slate-500 dark:text-slate-400">
-          Tip: Press <span className="font-semibold text-slate-700 dark:text-slate-200">Enter</span> to add. Double-click a task to edit.
+          Tip: Press <span className="font-semibold text-slate-700 dark:text-slate-200">Enter</span> to add. Double-click a task to edit. Use the clock to mark “In progress”.
         </footer>
       </div>
     </div>
