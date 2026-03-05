@@ -6,7 +6,8 @@ A frontend-only todo app built with **React + TypeScript + Vite + Tailwind CSS**
 
 - Add, complete, edit (double‑click), and delete todos
 - Filters: All / Active / In Progress / Completed
-- Search
+- Search (task + report-to)
+- Columns: **To be completed by** (due date) and **Report to**
 - Persists to `localStorage`
 - Theme toggle: system → light → dark
 

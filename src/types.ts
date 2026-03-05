@@ -3,6 +3,8 @@ export type Todo = {
   title: string
   completed: boolean
   inProgress: boolean
+  dueBy: string
+  reportTo: string
   createdAt: number
   updatedAt: number
 }
