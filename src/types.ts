@@ -2,10 +2,11 @@ export type Todo = {
   id: string
   title: string
   completed: boolean
+  inProgress: boolean
   createdAt: number
   updatedAt: number
 }
 
-export type Filter = 'all' | 'active' | 'completed'
+export type Filter = 'all' | 'active' | 'in_progress' | 'completed'
 
 export type Theme = 'system' | 'light' | 'dark'

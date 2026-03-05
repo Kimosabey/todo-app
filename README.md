@@ -5,7 +5,7 @@ A frontend-only todo app built with **React + TypeScript + Vite + Tailwind CSS**
 ## Features
 
 - Add, complete, edit (double‑click), and delete todos
-- Filters: All / Active / Completed
+- Filters: All / Active / In Progress / Completed
 - Search
 - Persists to `localStorage`
 - Theme toggle: system → light → dark

@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 
 import type { Todo } from '../types'
-import { CheckIcon, PencilIcon, TrashIcon } from './Icons'
+import { CheckIcon, ClockIcon, PencilIcon, TrashIcon } from './Icons'
 
 type Props = {
   todo: Todo
   onToggle: (id: string) => void
+  onToggleInProgress: (id: string) => void
   onDelete: (id: string) => void
   onUpdateTitle: (id: string, title: string) => void
 }
@@ -17,7 +18,7 @@ function formatTime(timestamp: number) {
   }).format(new Date(timestamp))
 }
 
-export function TodoItem({ todo, onToggle, onDelete, onUpdateTitle }: Props) {
+export function TodoItem({ todo, onToggle, onToggleInProgress, onDelete, onUpdateTitle }: Props) {
   const [isEditing, setIsEditing] = useState(false)
   const [draft, setDraft] = useState(todo.title)
   const inputRef = useRef<HTMLInputElement | null>(null)
@@ -58,22 +59,37 @@ export function TodoItem({ todo, onToggle, onDelete, onUpdateTitle }: Props) {
 
   return (
     <li className="group flex items-start gap-3 px-4 py-3">
-      <button
-        type="button"
-        onClick={() => onToggle(todo.id)}
-        className="mt-0.5 grid h-6 w-6 place-items-center rounded-full border border-slate-300 bg-white shadow-sm transition hover:border-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-600"
-        aria-label={todo.completed ? 'Mark as not completed' : 'Mark as completed'}
-      >
-        <span
-          className={
-            todo.completed
-              ? 'grid h-6 w-6 place-items-center rounded-full bg-indigo-600 text-white'
-              : 'grid h-6 w-6 place-items-center rounded-full'
-          }
+      <div className="mt-0.5 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => onToggle(todo.id)}
+          className="grid h-6 w-6 place-items-center rounded-full border border-slate-300 bg-white shadow-sm transition hover:border-slate-400 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 dark:border-slate-700 dark:bg-slate-950 dark:hover:border-slate-600"
+          aria-label={todo.completed ? 'Mark as not completed' : 'Mark as completed'}
         >
-          {todo.completed ? <CheckIcon className="h-4 w-4" /> : null}
-        </span>
-      </button>
+          <span
+            className={
+              todo.completed
+                ? 'grid h-6 w-6 place-items-center rounded-full bg-indigo-600 text-white'
+                : 'grid h-6 w-6 place-items-center rounded-full'
+            }
+          >
+            {todo.completed ? <CheckIcon className="h-4 w-4" /> : null}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => onToggleInProgress(todo.id)}
+          className={
+            todo.inProgress
+              ? 'grid h-6 w-6 place-items-center rounded-full border border-amber-200 bg-amber-100 text-amber-700 shadow-sm transition focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 dark:border-amber-500/30 dark:bg-amber-500/15 dark:text-amber-200'
+              : 'grid h-6 w-6 place-items-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500/60 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-400 dark:hover:border-slate-700 dark:hover:text-slate-200'
+          }
+          aria-label={todo.inProgress ? 'Mark as not in progress' : 'Mark as in progress'}
+        >
+          <ClockIcon className="h-3.5 w-3.5" />
+        </button>
+      </div>
 
       <div className="min-w-0 flex-1">
         {isEditing ? (
@@ -90,20 +106,23 @@ export function TodoItem({ todo, onToggle, onDelete, onUpdateTitle }: Props) {
             aria-label="Edit todo"
           />
         ) : (
-          <button
-            type="button"
-            className="w-full text-left"
-            onDoubleClick={startEditing}
-          >
-            <p
-              className={
-                todo.completed
-                  ? 'text-[15px] leading-relaxed text-slate-500 line-through dark:text-slate-400'
-                  : 'text-[15px] leading-relaxed text-slate-900 dark:text-slate-50'
-              }
-            >
-              {todo.title}
-            </p>
+          <button type="button" className="w-full text-left" onDoubleClick={startEditing}>
+            <div className="flex flex-wrap items-center gap-2">
+              <p
+                className={
+                  todo.completed
+                    ? 'text-[15px] leading-relaxed text-slate-500 line-through dark:text-slate-400'
+                    : 'text-[15px] leading-relaxed text-slate-900 dark:text-slate-50'
+                }
+              >
+                {todo.title}
+              </p>
+              {todo.inProgress && !todo.completed ? (
+                <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800 dark:bg-amber-500/15 dark:text-amber-200">
+                  In progress
+                </span>
+              ) : null}
+            </div>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{meta}</p>
           </button>
         )}
